@@ -5,15 +5,95 @@ frameworkVersion: '3'
 
 provider:
   name: aws
-  runtime: nodejs14.x
-
+  runtime: nodejs16.x
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+          Resource:
+            - Fn::GetAtt: [ accountsTable, Arn ]
+            - Fn::GetAtt: [ scrapedPostsTable, Arn ]
+            - Fn::GetAtt: [ subredditsTable, Arn ]
+            - Fn::GetAtt: [ postQueueTable, Arn ]
+            - Fn::GetAtt: [ submittedPostsTable, Arn ]
 functions:
-  hello:
-    handler: handler.hello
+  app:
+    handler: index.handler
     events:
-      - httpApi:
-          path: /
-          method: get
+      - http: ANY /
+      - http: 'ANY /{proxy+}'
+resources:
+  Resources:
+    accountsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: account-id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: account-id
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+        TableName: accounts
+    scrapedPostsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: post-id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: post-id
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+        TableName: scraped-posts
+    subredditsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: subreddit-id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: subreddit-id
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+        TableName: subreddits
+    postQueueTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: post-id
+            AttributeType: S
+          - AttributeName: account-id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: post-id
+            KeyType: HASH
+          - AttributeName: account-id
+            KeyType: RANGE
+        BillingMode: PAY_PER_REQUEST
+        TableName: post-queue
+    submittedPostsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: post-id
+            AttributeType: S
+          - AttributeName: account-id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: post-id
+            KeyType: HASH
+          - AttributeName: account-id
+            KeyType: RANGE
+        BillingMode: PAY_PER_REQUEST
+        TableName: submitted-posts
 
 plugins:
   - serverless-plugin-typescript
