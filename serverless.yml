@@ -34,11 +34,16 @@ provider:
     SUBREDDITS_TABLE: 'subreddits-${sls:stage}'
     POST_QUEUE_TABLE: 'post-queue-${sls:stage}'
     SUBMITTED_POSTS_TABLE: 'submitted-posts-${sls:stage}'
+    STAGE: '${sls:stage}'
 functions:
   accountsHandler:
     handler: api/account.handler
     events:
-      - httpApi: '*'
+      - httpApi: 'GET /${sls:stage}/accounts/fetch'
+      - httpApi: 'POST /${sls:stage}/accounts/create'
+      - httpApi: 'PATCH /${sls:stage}/accounts/patch'
+      - httpApi: 'DELETE /${sls:stage}/accounts/delete'
+resources:
   Resources:
     accountsTable:
       Type: AWS::DynamoDB::Table
@@ -106,4 +111,3 @@ functions:
 
 plugins:
   - serverless-plugin-typescript
-  - serverless-dotenv-plugin
