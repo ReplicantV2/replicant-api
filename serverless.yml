@@ -2,7 +2,12 @@ org: udittlamba
 app: replicant-api
 service: replicant-api
 frameworkVersion: '3'
-
+custom:
+  accountsTable: 'accounts-${sls:stage}'
+  scrapedPostsTable: 'scraped-posts-${sls:stage}'
+  subredditsTable: 'subreddits-${sls:stage}'
+  postQueueTable: 'post-queue-${sls:stage}'
+  submittedPostsTable: 'submitted-posts-${sls:stage}'
 provider:
   name: aws
   runtime: nodejs16.x
@@ -23,13 +28,17 @@ provider:
             - Fn::GetAtt: [ subredditsTable, Arn ]
             - Fn::GetAtt: [ postQueueTable, Arn ]
             - Fn::GetAtt: [ submittedPostsTable, Arn ]
+  environment:
+    ACCOUNTS_TABLE: 'accounts-${sls:stage}'
+    SCRAPED_POSTS_TABLE: 'scraped-posts-${sls:stage}'
+    SUBREDDITS_TABLE: 'subreddits-${sls:stage}'
+    POST_QUEUE_TABLE: 'post-queue-${sls:stage}'
+    SUBMITTED_POSTS_TABLE: 'submitted-posts-${sls:stage}'
 functions:
-  app:
-    handler: index.handler
+  accountsHandler:
+    handler: api/account.handler
     events:
-      - http: ANY /
-      - http: 'ANY /{proxy+}'
-resources:
+      - httpApi: '*'
   Resources:
     accountsTable:
       Type: AWS::DynamoDB::Table
@@ -41,7 +50,7 @@ resources:
           - AttributeName: account-id
             KeyType: HASH
         BillingMode: PAY_PER_REQUEST
-        TableName: accounts
+        TableName: ${self:custom.accountsTable}
     scrapedPostsTable:
       Type: AWS::DynamoDB::Table
       Properties:
@@ -52,7 +61,7 @@ resources:
           - AttributeName: post-id
             KeyType: HASH
         BillingMode: PAY_PER_REQUEST
-        TableName: scraped-posts
+        TableName: ${self:custom.scrapedPostsTable}
     subredditsTable:
       Type: AWS::DynamoDB::Table
       Properties:
@@ -63,7 +72,7 @@ resources:
           - AttributeName: subreddit-id
             KeyType: HASH
         BillingMode: PAY_PER_REQUEST
-        TableName: subreddits
+        TableName: ${self:custom.subredditsTable}
     postQueueTable:
       Type: AWS::DynamoDB::Table
       Properties:
@@ -78,7 +87,7 @@ resources:
           - AttributeName: account-id
             KeyType: RANGE
         BillingMode: PAY_PER_REQUEST
-        TableName: post-queue
+        TableName: ${self:custom.postQueueTable}
     submittedPostsTable:
       Type: AWS::DynamoDB::Table
       Properties:
@@ -93,7 +102,8 @@ resources:
           - AttributeName: account-id
             KeyType: RANGE
         BillingMode: PAY_PER_REQUEST
-        TableName: submitted-posts
+        TableName: ${self:custom.submittedPostsTable}
 
 plugins:
   - serverless-plugin-typescript
+  - serverless-dotenv-plugin
