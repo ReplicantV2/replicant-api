@@ -39,10 +39,7 @@ functions:
   accountsHandler:
     handler: api/account.handler
     events:
-      - httpApi: 'GET /${sls:stage}/accounts/fetch'
-      - httpApi: 'POST /${sls:stage}/accounts/create'
-      - httpApi: 'PATCH /${sls:stage}/accounts/patch'
-      - httpApi: 'DELETE /${sls:stage}/accounts/delete'
+      - httpApi: '*'
 resources:
   Resources:
     accountsTable:

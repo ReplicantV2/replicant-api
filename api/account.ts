@@ -43,19 +43,40 @@ async function saveAccount(account: Account) {
   // save the item to the database
   await dynamodb
     .put({
-      TableName: "accounts-dev",
+      TableName: process.env.ACCOUNTS_TABLE,
       Item: item,
     })
     .promise();
 }
+
+//create a function to get an account's data from the dynamoDB database
+async function getAccount(account_name: string) {
+  // create a query to get the account from the database
+  const params = {
+    TableName: process.env.ACCOUNTS_TABLE,
+    Key: {
+      account_name: account_name,
+    },
+  };
+  // get the account from the database
+  const data = await dynamodb.get(params).promise();
+  // return the account
+  return data.Item;
+}
+
 app.use(express.json());
 
-app.get(`/${process.env.STAGE}/accounts/fetch`, function (req, res) {
-  res.json(req.query);
-});
-app.post(`/${process.env.STAGE}/accounts/create`, async function (req, res) {
+app.get(
+  `/${process.env.STAGE}/accounts/:account_name`,
+  async function (req, res) {
+    res.json(await getAccount(req.params.account_name));
+  }
+);
+
+app.post(`/${process.env.STAGE}/accounts`, async function (req, res) {
   try {
     await saveAccount(req.body);
+    res.json({ message: "Account added successfully" });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
