@@ -10,7 +10,7 @@ const dynamodb = new AWS.DynamoDB.DocumentClient({ region: "us-east-1" });
 
 
 // create a function to save an account's data to the database
-Account.prototype.save = async function(account: Account) {
+async function saveAccount (account: Account) {
   // create a new item to save to the database
   const snoo = new Snoowrap({
     userAgent: "replicant_v1",
@@ -20,20 +20,20 @@ Account.prototype.save = async function(account: Account) {
     password: account.password,
   })
 
-  const me = snoo.getMe();
+  // @ts-ignore
+  const me = await snoo.getMe();
   const item = {
     user_agent: "replicant_v1",
     client_id: account.client_id,
     client_secret: account.client_secret,
     account_name: account.account_name,
     password: account.password,
-    post_karma: 0,
-    comment_karma: me.comment_karma.toString(),
-    account_age: 0,
+    post_karma: me.link_karma,
+    comment_karma: me.comment_karma,
     is_sold: false,
     is_harvested: false,
-    is_suspended: false,
-    cake_day: 0,
+    is_suspended: me.is_suspended,
+    cake_day: me.created_utc,
   };
 
   // save the item to the database
@@ -68,12 +68,11 @@ async function updateAccount(account: Account) {
       account_name: account.account_name,
     },
     UpdateExpression:
-      "set #ua = :ua, #pk = :pk, #ck = :ck, #age = :age, #sold = :sold, #harvested = :harvested, #suspended = :suspended, #cake = :cake",
+      "set #ua = :ua, #pk = :pk, #ck = :ck, #sold = :sold, #harvested = :harvested, #suspended = :suspended, #cake = :cake",
     ExpressionAttributeNames: {
       "#ua": "user_agent",
       "#pk": "post_karma",
       "#ck": "comment_karma",
-      "#age": "account_age",
       "#sold": "is_sold",
       "#harvested": "is_harvested",
       "#suspended": "is_suspended",
@@ -83,7 +82,6 @@ async function updateAccount(account: Account) {
       ":ua": account.user_agent,
       ":pk": account.post_karma,
       ":ck": account.comment_karma,
-      ":age": account.account_age,
       ":sold": account.is_sold,
       ":harvested": account.is_harvested,
       ":suspended": account.is_suspended,
@@ -117,7 +115,6 @@ async function deleteAccount(account_name: string) {
   await dynamodb.delete(params).promise();
 }
 
-
 // @ts-ignore
 async function getKarma(account_name: string) {
   const account = await getAccount(account_name);
@@ -147,7 +144,7 @@ app.get(`/${process.env.STAGE}/accounts`, async function (req, res) {
 
 app.post(`/${process.env.STAGE}/accounts`, async function (req, res) {
   try {
-    await Account.save(req.body);
+    await saveAccount(req.body);
     res.json({ message: "Account added successfully" });
   } catch (e) {
     res.status(500).json({ error: e.message });
