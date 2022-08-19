@@ -1,46 +1,41 @@
 import * as express from "express";
 import * as serverless from "serverless-http";
 import * as AWS from "aws-sdk";
-import * as snoowrap from "snoowrap";
+import * as Snoowrap from "snoowrap";
+import {ScanInput} from "aws-sdk/clients/dynamodb";
+import {Account} from "./accounts";
 
 const app = express();
 const dynamodb = new AWS.DynamoDB.DocumentClient({ region: "us-east-1" });
 
-// create account type
-interface Account {
-  user_agent: string;
-  client_id: string;
-  client_secret: string;
-  account_name: string;
-  password: string;
-  post_karma: number;
-  comment_karma: number;
-  account_age: number;
-  is_sold: boolean;
-  is_harvested: boolean;
-  is_suspended: boolean;
-  is_banned: boolean;
-  cake_day: number;
-}
 
 // create a function to save an account's data to the database
-async function saveAccount(account: Account) {
+Account.prototype.save = async function(account: Account) {
   // create a new item to save to the database
+  const snoo = new Snoowrap({
+    userAgent: "replicant_v1",
+    clientId: account.client_id,
+    clientSecret: account.client_secret,
+    username: account.account_name,
+    password: account.password,
+  })
+
+  const me = snoo.getMe();
   const item = {
-    user_agent: "",
+    user_agent: "replicant_v1",
     client_id: account.client_id,
     client_secret: account.client_secret,
     account_name: account.account_name,
     password: account.password,
     post_karma: 0,
-    comment_karma: 0,
+    comment_karma: me.comment_karma.toString(),
     account_age: 0,
     is_sold: false,
     is_harvested: false,
     is_suspended: false,
-    is_banned: false,
     cake_day: 0,
   };
+
   // save the item to the database
   await dynamodb
     .put({
@@ -73,7 +68,7 @@ async function updateAccount(account: Account) {
       account_name: account.account_name,
     },
     UpdateExpression:
-      "set #ua = :ua, #pk = :pk, #ck = :ck, #age = :age, #sold = :sold, #harvested = :harvested, #suspended = :suspended, #banned = :banned, #cake = :cake",
+      "set #ua = :ua, #pk = :pk, #ck = :ck, #age = :age, #sold = :sold, #harvested = :harvested, #suspended = :suspended, #cake = :cake",
     ExpressionAttributeNames: {
       "#ua": "user_agent",
       "#pk": "post_karma",
@@ -82,7 +77,6 @@ async function updateAccount(account: Account) {
       "#sold": "is_sold",
       "#harvested": "is_harvested",
       "#suspended": "is_suspended",
-      "#banned": "is_banned",
       "#cake": "cake_day",
     },
     ExpressionAttributeValues: {
@@ -93,7 +87,6 @@ async function updateAccount(account: Account) {
       ":sold": account.is_sold,
       ":harvested": account.is_harvested,
       ":suspended": account.is_suspended,
-      ":banned": account.is_banned,
       ":cake": account.cake_day,
     },
   };
@@ -102,15 +95,13 @@ async function updateAccount(account: Account) {
 }
 
 // create a function to get all accounts from the database with pagination
-async function getAllAccounts(limit: number, nextToken: string) {
+async function getAllAccounts(limit: number, nextToken: ScanInput) {
   // create a query to get all accounts from the database
-  const params = {
+  return await dynamodb.scan({
     TableName: process.env.ACCOUNTS_TABLE,
     Limit: limit,
     ExclusiveStartKey: nextToken,
-  };
-
-  return await dynamodb.scan(params).promise();
+  }).promise();
 }
 
 //delete an account from the database
@@ -126,16 +117,18 @@ async function deleteAccount(account_name: string) {
   await dynamodb.delete(params).promise();
 }
 
+
+// @ts-ignore
 async function getKarma(account_name: string) {
   const account = await getAccount(account_name);
-  const snoo = new snoowrap({
-    userAgent: account.user_agent,
-    clientId: account.client_id,
-    clientSecret: account.client_secret,
-    username: account.username,
-    password: account.password,
+  const snoo = new Snoowrap({
+    userAgent: account.user_agent.toString(),
+    clientId: account.client_id.toString(),
+    clientSecret: account.client_secret.toString(),
+    username: account.account_name.toString(),
+    password: account.password.toString(),
   });
-  return snoo.getMe().getComments();
+  return snoo.getMe();
 }
 app.use(express.json());
 
@@ -148,13 +141,13 @@ app.get(
 
 app.get(`/${process.env.STAGE}/accounts`, async function (req, res) {
   const limit = parseInt(req.query.limit as string);
-  const nextToken = req.query.nextToken as string;
+  const nextToken = req.query.nextToken as unknown as ScanInput;
   res.json(await getAllAccounts(limit, nextToken));
 });
 
 app.post(`/${process.env.STAGE}/accounts`, async function (req, res) {
   try {
-    await saveAccount(req.body);
+    await Account.save(req.body);
     res.json({ message: "Account added successfully" });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -165,14 +158,14 @@ app.patch(`/${process.env.STAGE}/accounts/`, async function (req, res) {
   res.send("accounts patched successfully");
 });
 
-app.delete(`/${process.env.STAGE}/accounts/`, async function (req, res) {
-  await deleteAccount(req.body.account_name);
+app.delete(`/${process.env.STAGE}/accounts/:account_name`, async function (req, res) {
+  await deleteAccount(req.params.account_name);
   res.send("accounts deleted successfully");
 });
 
 app.get(`/${process.env.STAGE}/karma/:account_name`, async function (req, res) {
-  const karma = await getKarma(req.params.account_name);
-  res.send(karma);
+  const me = await getKarma(req.params.account_name);
+  res.json({totalKarma: me.total_karma, linkKarma: me.link_karma, commentKarma: me.comment_karma});
 });
 
 export const handler = serverless(app);
