@@ -7,7 +7,7 @@
     "serverless-http": "^3.0.2"
   },
   "devDependencies": {
-    "@types/aws-lambda": "^8.10.102",
+    "@types/aws-lambda": "^8.10.103",
     "@types/express": "^4.17.13",
     "serverless": "^3.1.1",
     "serverless-plugin-typescript": "^2.1.1",
